@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from schema.postDTO import Create_post, Post_update, PostResponse, PostListResponse, PostWithUserResponse, PostPerUser
+from schema.postDTO import Create_post, Post_update, PostResponse, PostListResponse, PostWithUserResponse, PostPerUser, PostSummaryResponse
 from database.database import get_db
 from database.models import Post, User
 from sqlalchemy.orm import Session, joinedload, load_only
@@ -265,3 +265,11 @@ def users_with_zero_posts(db : Session = Depends(get_db)):
         }
         for id, name in result
     ]
+
+# GET POST SUMMARY -->
+@post_router.get("/summary", response_model = list[PostSummaryResponse])
+def post_summary(db : Session = Depends(get_db)):
+    print("endpoint reached mutherfucker..")
+    posts = db.query(Post).all()
+
+    return posts

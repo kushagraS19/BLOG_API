@@ -34,3 +34,9 @@ class PostPerUser(BaseModel):
     name : str
     total_posts : int
 
+class PostSummaryResponse(BaseModel):
+    id : int
+    title : str
+    description_length : int
+    reading_time : int
+    is_long_post : bool

@@ -5,6 +5,7 @@ from database.models import User
 from sqlalchemy.orm import Session, joinedload, selectinload, load_only
 from utils.security import hash_password
 from dependencies.permissions import admin_required
+import services.user_services as user_services
 
 user_router = APIRouter(
     prefix = "/user",
@@ -14,28 +15,9 @@ user_router = APIRouter(
 @user_router.post("/create", status_code = 201, response_model = User_response)
 def register_user(payload : Create_user, db : Session = Depends(get_db)):
 
-    existing = db.query(User).filter(
-        User.email == payload.email
-    ).first()
-
-    if existing :
-        raise HTTPException(
-            status_code = 400,
-            detail = "Email already exist"
-        )
-    
-    user = User(
-        name = payload.name,
-        email = payload.email,
-        password = hash_password(payload.password),
-        role = "admin"
+    return user_services.register_user(
+        db,payload
     )
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    return user
 
 @user_router.get("/")
 def get_all_users(db : Session = Depends(get_db), current_user = Depends(admin_required)):

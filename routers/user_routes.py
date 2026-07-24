@@ -16,7 +16,8 @@ user_router = APIRouter(
 def register_user(payload : Create_user, db : Session = Depends(get_db)):
 
     return user_services.register_user(
-        db,payload
+        db,
+        payload
     )
 
 @user_router.get("/")

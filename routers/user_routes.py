@@ -38,15 +38,10 @@ def get_all_users(db : Session = Depends(get_db), current_user = Depends(admin_r
 
 @user_router.get("/get_user_by_id/{user_id}", response_model = User_response)
 def get_user_by_id(user_id : int ,db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-
-    if not user:
-        raise HTTPException(
-            status_code = 404,
-            detail   = "User not found"
-        )
-    
-    return user
+    return user_services.get_user_by_id(
+        db,
+        user_id
+    )
 
 # USER PROFILE -->
 @user_router.get("/users/{user_id}")

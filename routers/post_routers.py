@@ -7,6 +7,7 @@ from dependencies.auth import get_current_user
 from dependencies.permissions import admin_required
 from typing import Optional, Literal
 from sqlalchemy import asc, desc, or_ , func
+import services.post_services as post_services
 
 post_router = APIRouter(
     prefix = "/posts",
@@ -16,17 +17,11 @@ post_router = APIRouter(
 # CREATE A POST -->
 @post_router.post("/create_post", status_code = 201, response_model = PostResponse )
 def create_post(payload : Create_post, db : Session = Depends(get_db), current_user = Depends(get_current_user)):
-    post = Post(
-        title = payload.title,
-        description = payload.description,
-        user_id = current_user.id
+    return post_services.create_post(
+        db,
+        payload,
+        current_user
     )
-
-    db.add(post)    
-    db.commit()
-    db.refresh(post)
-
-    return post
 
 # GET ALL POSTS -->
 @post_router.get("/all_posts", response_model = PostListResponse)
@@ -49,36 +44,15 @@ def get_all_posts(
     search : Optional[str] = None,
     ):
 
-    query = db.query(Post)
-    total_posts = query.count()
-
-    if title:
-        query = query.filter(Post.title.ilike(f"%{title}%"))
-
-    if user_id:
-        query = query.filter(Post.user_id == user_id)
-
-    if search:
-        query = query.filter(
-            or_(
-                Post.title.ilike(f"%{search}%"),
-                Post.description.ilike(f"%{search}%")
-            )
-        )
-
-    column = getattr(Post, sort_by)
-
-    query = query.order_by(
-        asc(column) if order == "asc" else desc(column)
-    )
-
-    query = query.offset(offset).limit(limit).all()
-
-    return PostListResponse(
-        total_posts = total_posts,
+    return post_services.get_all_posts(
+        db = db,
+        title = title,
+        user_id = user_id,
+        search = search,
+        sort_by = sort_by,
+        order = order,
         limit = limit,
-        offset = offset,
-        posts = query
+        offset = offset
     )
 
 # GET POST WITH USER NAME AND EMAIL
@@ -89,16 +63,7 @@ def get_post_with_user(db : Session = Depends(get_db)):
         db.query(Post).options(joinedload(Post.user)).all()
     )
 
-    return [
-        PostWithUserResponse(
-            id = post.id,
-            title = post.title,
-            description = post.description,
-            author = post.user.name,
-            author_email = post.user.email
-        )
-        for post in posts
-    ]
+    return post_services.get_post_with_user(db = db)
 
 # TOTAL POSTS -->
 @post_router.get("/posts/stats/total")

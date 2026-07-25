@@ -78,7 +78,6 @@ def post_per_user(db : Session = Depends(get_db)):
 # USERS WHO HAVE ATLEAST 2 POSTS WITH PYTHON IN ITS TITLE -->
 @post_router.get("/posts/stats/active-users")
 def active_users(db : Session = Depends(get_db)):
-
     return post_services.active_users(db = db)
 
 # GET POST BY ID -->

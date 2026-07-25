@@ -233,3 +233,28 @@ def users_with_zero_posts(db : Session):
             }
             for id , name in users
       ]
+
+# POST SUMMARY -->
+def post_summary(db : Session):
+      return db.query(Post).all()
+
+# TOTAL POSTS -->
+def total_posts(db : Session):
+      total = db.query(func.count(Post.id)).scalar()
+
+      return {
+            "total_posts" : total
+      }
+
+# TOTAL POSTS BY SPECIFIC ID -->
+def total_posts_by_id(db : Session, user_id : int):
+      total = (
+            db.query(Post).filter(Post.user_id == user_id).all()
+      )
+
+      return [
+            {
+                  "user_id" : user_id,
+                  "total_posts" : total
+            }
+      ]

@@ -58,29 +58,17 @@ def get_all_posts(
 # GET POST WITH USER NAME AND EMAIL
 @post_router.get("/posts/with-user", response_model = list[PostWithUserResponse])
 def get_post_with_user(db : Session = Depends(get_db)):
-
     return post_services.get_post_with_user(db = db)
 
 # TOTAL POSTS -->
 @post_router.get("/posts/stats/total")
 def give_total_posts(db : Session = Depends(get_db)):
-    total = db.query(func.count(Post.id)).scalar()
-
-    return {
-        "total_posts" : total
-    }
+    return post_services.total_posts(db=db)
 
 # TOTAL POSTS BY SPECIFIC ID -->
 @post_router.get("/posts/stats/total/{user_id}")
 def give_total_posts_by_user_id(user_id : int, db : Session = Depends(get_db)):
-    total = (
-        db.query(func.count(Post.id)).filter(Post.user_id == user_id).scalar()
-    )
-
-    return {
-        "user_id" : user_id,
-        "total_posts" : total
-    }
+    return post_services.total_posts_by_id(db=db, user_id=user_id)
 
 # POSTS PER USER -->
 @post_router.get("/posts/stats/user-posts", response_model = list[PostPerUser])
@@ -134,6 +122,4 @@ def users_with_zero_posts(db : Session = Depends(get_db)):
 # GET POST SUMMARY -->
 @post_router.get("/summary", response_model = list[PostSummaryResponse])
 def post_summary(db : Session = Depends(get_db)):
-    posts = db.query(Post).all()
-
-    return posts
+    return post_services.post_summary(db=db)

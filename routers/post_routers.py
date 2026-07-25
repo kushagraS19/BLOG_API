@@ -59,10 +59,6 @@ def get_all_posts(
 @post_router.get("/posts/with-user", response_model = list[PostWithUserResponse])
 def get_post_with_user(db : Session = Depends(get_db)):
 
-    posts = (
-        db.query(Post).options(joinedload(Post.user)).all()
-    )
-
     return post_services.get_post_with_user(db = db)
 
 # TOTAL POSTS -->
@@ -89,55 +85,21 @@ def give_total_posts_by_user_id(user_id : int, db : Session = Depends(get_db)):
 # POSTS PER USER -->
 @post_router.get("/posts/stats/user-posts", response_model = list[PostPerUser])
 def post_per_user(db : Session = Depends(get_db)):
-    posts = (
-        db.query(
-            User.name,
-            func.count(Post.id).label("total_posts")
-        ).outerjoin(Post).group_by(User.name).all()
-    )
-
-    return [
-        PostPerUser(
-            name = name,
-            total_posts = total
-        )
-        for name, total in posts
-    ]
+    return post_services.posts_per_user(db = db)
 
 # USERS WHO HAVE ATLEAST 2 POSTS WITH PYTHON IN ITS TITLE -->
 @post_router.get("/posts/stats/active-users")
 def active_users(db : Session = Depends(get_db)):
 
-    result = (
-        db.query(
-            User.id,
-            User.name,
-            func.count(Post.id).label("total_posts")
-        ).join(User).filter(Post.title.ilike("%Python%")).group_by(User.id, User.name).having(func.count(Post.id) >= 1).order_by("total_posts").all()
-    )
-    print(result)
-
-    return [
-        {
-            "User-id" : user_id,
-            "User-name" : user_name,    
-            "total" : total
-        }
-        for user_id, user_name, total in result
-    ]
+    return post_services.active_users(db = db)
 
 # GET POST BY ID -->
 @post_router.get("/posts/{post_id}")
 def get_post_by_id(post_id : int, db : Session = Depends(get_db), current_user = Depends(get_current_user)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-
-    if not post:
-        raise HTTPException(
-            status_code = 404,
-            detail = "Post not found"
-        )
-    
-    return post 
+    return post_services.get_post_by_id(
+        db = db,
+        post_id = post_id
+    )
 
 # DELETE A POST --> 
 @post_router.delete("/deletepost/{post_id}")

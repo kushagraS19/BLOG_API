@@ -104,99 +104,36 @@ def get_post_by_id(post_id : int, db : Session = Depends(get_db), current_user =
 # DELETE A POST --> 
 @post_router.delete("/deletepost/{post_id}")
 def delete_post(post_id : int, db : Session = Depends(get_db), current_user = Depends(get_current_user)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    
-    if not post:
-        raise HTTPException(
-            status_code = 404,
-            detail = "Post not found"
-        )
-
-    if post.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(
-            status_code = 403,
-            detail = "Unauthorized"
-        )
-    
-    db.delete(post)
-    db.commit()
-
-    return {
-        "message" : "Post deleted successfully"
-    }
+    return post_services.delete_post(
+        db = db,
+        post_id= post_id,
+        current_user=current_user
+    )
 
 # UPDATE A POST -->
 @post_router.put("/update_post/{post_id}", response_model = PostResponse)
 def update_post(post_id : int,payload : Post_update, db : Session = Depends(get_db), current_user = Depends(get_current_user)):
 
-    post = db.query(Post).filter(Post.id == post_id).first()
-
-    if not post:
-        raise HTTPException(
-            status_code = 404,
-            detail = "Post not found"
-        )
-    
-    if post.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(
-            status_code = 403,
-            detail = "Unauthorized"
-        )
-
-    updates = payload.model_dump(exclude_unset = True)
-
-    for key, value in updates.items():
-        setattr(post, key, value)
-
-    db.commit()     
-    db.refresh(post)    
-
-    return post
+    return post_services.update_post(
+        db = db,
+        post_id= post_id,
+        payload=payload,
+        current_user=current_user
+    )
 
 # All-users Stats -->
 @post_router.get("/posts/stats/all-users")
 def all_users_stats(db : Session = Depends(get_db)):
-    result = (
-        db.query(
-            User.id,
-            User.name,
-            func.count(Post.id).label("total_posts")
-        ).outerjoin(Post)
-            .group_by(User.id, User.name)
-            .order_by(User.id)
-            .all()
-    )
-    return [
-        {
-            "user_id" : user_id,
-            "name" : name,
-            "total_posts" : total
-        }
-        for user_id, name, total in result
-    ]
+    return post_services.all_users_stats(db = db)
 
 # USERS WITH 0 POSTS -->
 @post_router.get("/posts/stats/all_with_zero_posts")
 def users_with_zero_posts(db : Session = Depends(get_db)):
-    result = (
-        db.query(
-            User.id,
-            User.name
-        ).outerjoin(Post).group_by(User.id, User.name).having(func.count(Post.id) == 0).order_by(User.id).all()
-    )
-    
-    return [
-        {
-            "user_id" : id,
-            "name" : name
-        }
-        for id, name in result
-    ]
+    return post_services.users_with_zero_posts(db=db)
 
 # GET POST SUMMARY -->
 @post_router.get("/summary", response_model = list[PostSummaryResponse])
 def post_summary(db : Session = Depends(get_db)):
-    print("endpoint reached mutherfucker..")
     posts = db.query(Post).all()
 
     return posts

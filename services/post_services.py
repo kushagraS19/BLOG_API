@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from schema.postDTO import Create_post, PostListResponse, PostWithUserResponse, PostPerUser
+from schema.postDTO import Create_post, PostListResponse, PostWithUserResponse, PostPerUser, Post_update, PostResponse, PostSummaryResponse
 from database.models import Post
 from database.models import User
 from sqlalchemy import asc, desc, or_ , func
@@ -155,3 +155,81 @@ def delete_post(db : Session, post_id : int, current_user : User):
 
       db.delete(post)
       db.commit()
+
+      return {
+            "message" : "Post deleted successfully",
+            "post" : post
+      }
+
+# UPDATE POST -->
+def update_post(db : Session, post_id : int, payload : Post_update, current_user : User):
+      post = db.query(Post).filter(Post.id == post_id).first()
+
+      if post.user_id != current_user.id and current_user.role != "admin":
+            raise HTTPException(
+                  status_code = 403,
+                  detail = "Unauthorized"
+            )
+
+      if not post:
+            raise HTTPException(
+                  status_code = 404,
+                  detail = "Post not found"
+            )
+
+      updates = payload.model_dump(exclude_unset = True)
+
+      for key, value in updates.items():
+            setattr(post, key, value)
+
+      db.commit()
+      db.refresh(post)
+
+      return PostResponse(
+            id = post.id,
+            title = post.title,
+            description = post.description
+      )
+
+# ALL USERS STATS -->
+def all_users_stats(db : Session):
+      stats = (
+            db.query(
+                  User.id,
+                  User.name,
+                  func.count(Post.id).label("total_posts")
+            ).outerjoin(Post)
+            .group_by(User.id, User.name)
+            .order_by(User.id)
+            .all()
+      )
+
+      return [
+            {
+                  "user_id" : id,
+                  "name" : name,
+                  "total_posts" : total
+            }
+            for id, name, total in stats
+      ]
+
+# USERS WITH 0 POSTS -->
+def users_with_zero_posts(db : Session):
+      users = (
+            db.query(
+                  User.id,
+                  User.name
+            ).outerjoin(Post)
+            .group_by(User.id, User.name)
+            .having(func.count(Post.id) == 0)
+            .order_by(User.id)
+            .all()
+      )
+
+      return [
+            {
+                  "id" : id,
+                  "name" : name
+            }
+            for id , name in users
+      ]

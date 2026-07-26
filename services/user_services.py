@@ -4,16 +4,14 @@ from database.models import User
 from fastapi import  HTTPException
 from sqlalchemy.orm import Session, joinedload, selectinload, load_only
 from dependencies.permissions import admin_required
+from sqlalchemy.exc import IntegrityError
 
 # USER REGISTER -->
 def register_user(db : Session, payload : Create_user):
     existing = db.query(User).filter(User.email == payload.email).first()
 
     if existing:
-        raise HTTPException(
-            status_code = 400,
-            detail = "Email already exist"
-        )
+        raise ValueError("Email already exist")
 
     user = User(
         name = payload.name,
@@ -22,11 +20,20 @@ def register_user(db : Session, payload : Create_user):
         role = "admin"
     )
 
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    try : 
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-    return user
+        return user
+
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code = 400,
+            detail = "Email already exist"
+        )
 
 # GET USER BYB ID -->
 def get_user_by_id(db : Session, user_id : int):

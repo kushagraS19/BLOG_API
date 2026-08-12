@@ -5,10 +5,13 @@ from fastapi import  HTTPException
 from sqlalchemy.orm import Session, joinedload, selectinload, load_only
 from app.dependencies.permissions import admin_required
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 # USER REGISTER -->
-def register_user(db : Session, payload : Create_user):
-    existing = db.query(User).filter(User.email == payload.email).first()
+async def register_user(db : AsyncSession, payload : Create_user):
+    result = await db.execute(select(User).where(User.email == payload.email))
+    existing = result.scalars().first()
 
     if existing:
         raise ValueError("Email already exist")
@@ -22,23 +25,23 @@ def register_user(db : Session, payload : Create_user):
 
     try : 
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
 
         return user
 
     except IntegrityError:
-        db.rollback()
+        await db.rollback()
 
         raise HTTPException(
             status_code = 400,
             detail = "Email already exist"
         )
 
-# GET USER BYB ID -->
-def get_user_by_id(db : Session, user_id : int):
-    user = db.query(User).filter(User.id == user_id).first()
-
+# GET USER BY ID -->
+async def get_user_by_id(db : AsyncSession, user_id : int):
+    user = await db.execute(select(User).where(User.id == user_id))
+    user = user.scalars().first()
     if not user:
         raise HTTPException(
             status_code = 404,
@@ -48,26 +51,25 @@ def get_user_by_id(db : Session, user_id : int):
     return user
 
 # GET ALL USERS -->
-def get_all_users(db : Session):
-    users = db.query(User).all()
+async def get_all_users(db : AsyncSession):
+
+    result = await db.execute(
+        select(User)
+    )
+    users = result.scalars().all()
+    print(users)
 
     return {
         "total_users" : len(users),
-        "users" : [
-            {
-                'user_id' : id,
-                'name' : name,
-                'email' : email
-            }
-            for id, name, email in users
-        ]
+        "users" : users
     }
 
 # USER PROFILE -->
-def user_profile(db : Session, user_id : int):
-    user = (
-        db.query(User).options(selectinload(User.posts)).filter(User.id == user_id).first()
+async def user_profile(db : AsyncSession, user_id : int):
+    user = await db.execute(
+        select(User).options(selectinload(User.posts)).where(User.id == user_id)
     )
+    user = user.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -75,35 +77,24 @@ def user_profile(db : Session, user_id : int):
             detail = "User not found"
         )
 
-    return {
-        "id" : user_id,
-        "name" : user.name,
-        "email" : user.email,
-        "posts" : [
-            {
-                "id" : post.id,
-                "title" : post.title,
-                "description" : post.description
-            }
-            for post in user.posts
-        ]
-    }
+    return user
 
 # ADMIN DASHBOARD -->
-def admin_dashboard(db : Session, limit : int , offset : int,current_user : User):
+async def admin_dashboard(db : AsyncSession, limit : int , offset : int,current_user : User):
     if current_user.role != "admin":
         raise HTTPException(
             status_code = 403,
             detail = "Unauthorized"
         )
 
-    users = (
-        db.query(User)
-        .options(load_only(User.id, User.name),selectinload(User.posts))
-        .order_by(User.id)
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+    stmt = (select(User)
+            .options(load_only(User.id, User.name),
+                     selectinload(User.posts))
+            .order_by(User.id.asc())
+            .offset(offset)
+            .limit(limit))
+
+    result = await db.execute(stmt)
+    users = result.scalars().all()
 
     return users

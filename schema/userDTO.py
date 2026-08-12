@@ -16,9 +16,19 @@ class User_response(BaseModel):
 
     model_config = ConfigDict(from_attributes = True)
 
+class UserResponseList(BaseModel):
+    total_users : int
+    users : list[User_response]
+
 class AdminDashboardResponse(BaseModel):
     id : int
     name : str
     posts : list[PostResponse]
 
     model_config = ConfigDict(from_attributes = True)
+
+class User_profile(BaseModel):
+    id : int
+    name : str
+    email : str
+    posts : list[PostResponse]

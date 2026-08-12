@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session, joinedload
 from app.schema.postDTO import Create_post, PostListResponse, PostWithUserResponse, PostPerUser, Post_update, PostResponse, PostSummaryResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import Post
 from app.database.models import User
-from sqlalchemy import asc, desc, or_ , func
+from sqlalchemy import asc, desc, or_ , func, select
 from fastapi import HTTPException
 
 # CREATE POST -->
-def create_post(db : Session, payload : Create_post, current_user : User):
+async def create_post(db : AsyncSession, payload : Create_post, current_user : User):
 
     post = Post(
         title = payload.title,
@@ -15,13 +16,13 @@ def create_post(db : Session, payload : Create_post, current_user : User):
     )
 
     db.add(post)
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
 
     return post
 
 # GET ALL POSTS -->
-def get_all_posts(
+async def get_all_posts(
         db : Session,
         title : str | None,
         user_id : int | None,
@@ -31,16 +32,19 @@ def get_all_posts(
         limit : int,
         offset : int
 ):
-    query = db.query(Post)
+    stmt = select(Post)
+    count_stmt = select(func.count()).select_from(Post)
+    count = await db.execute(count_stmt)
+    total_posts = count.scalar_one()
     
     if title:
-            query = query.filter(Post.title.ilike(f"%{title}%"))
+            stmt = stmt.where(Post.title.ilike(f"%{title}%"))
     
     if user_id:
-            query = query.filter(Post.user_id == user_id)
+            stmt = stmt.where(Post.user_id == user_id)
     
     if search:
-            query = query.filter(
+            stmt = stmt.where(
                 or_(
                     Post.title.ilike(f"%{search}%"),
                     Post.description.ilike(f"%{search}%")
@@ -49,25 +53,27 @@ def get_all_posts(
     
     column = getattr(Post, sort_by)
     
-    query = query.order_by(
+    stmt = stmt.order_by(
             asc(column) if order == "asc" else desc(column)
         )
     
-    query = query.offset(offset).limit(limit).all()
-    total_posts = query.count()
+    stmt = stmt.offset(offset).limit(limit)
+
+    result = await db.execute(stmt)
+    posts = result.scalars().all()
     
     return PostListResponse(
             total_posts = total_posts,
             limit = limit,
             offset = offset,
-            posts = query
+            posts = posts
         )
 
 # GET POST WITH USER -->
-def get_post_with_user(db : Session):
-      posts = (
-            db.query(Post).options(joinedload(Post.user)).all()
-      )
+async def get_post_with_user(db : AsyncSession):
+      stmt = (select(Post).options(joinedload(Post.user)))
+      result = await db.execute(stmt)
+      posts = result.scalars().all()
 
       return [
             PostWithUserResponse(
@@ -81,17 +87,11 @@ def get_post_with_user(db : Session):
       ]
 
 # POSTS PER USER -->
-def posts_per_user(db : Session):
+async def posts_per_user(db : AsyncSession):
       print("before")
-      posts = (
-            db.query(
-                  User.name,
-                  func.count(Post.id).label("total_posts"))
-                  .outerjoin(Post)
-                  .group_by(User.name)
-                  .all()
-      )
-      print("after")
+      stmt = (select(User.name,func.count(Post.id)).outerjoin(Post).group_by(User.name))
+      result = await db.execute(stmt)
+      posts = result.all()
 
       return [
             PostPerUser(
@@ -102,20 +102,19 @@ def posts_per_user(db : Session):
       ]
 
 # USERS WHO HAVE ATLEAST 2 POSTS WITH PYTHON IN ITS TITLE -->
-def active_users(db : Session):
-      users = (
-            db.query(
-                  User.name,
-                  User.name,
-                  func.count(Post.id).label("total_posts")
+async def active_users(db : AsyncSession):
+      stmt = (select(
+            User.id, 
+            User.name,
+            func.count(Post.id).label("total_posts")
             ).join(User)
-            .filter(Post.title.ilike("%Python%"))
             .group_by(User.id, User.name)
-            .having(func.count(Post.id) >= 2)
+            .having(func.count(Post.id) >= 1)
             .order_by(User.id)
-            .all()
-      )
-
+            )
+      result = await db.execute(stmt)
+      users = result.all()
+      
       return [
             {
                   "user_id" : id,
@@ -126,8 +125,10 @@ def active_users(db : Session):
       ]
 
 # GET POST BY ID -->
-def get_post_by_id(db : Session, post_id : int):
-      post = db.query(Post).filter(Post.id == post_id).first()
+async def get_post_by_id(db : AsyncSession, post_id : int):
+      stmt = select(Post).where(Post.id == post_id)
+      result = await db.execute(stmt)
+      post = result.scalars().first()
 
       if not post:
             raise HTTPException(
@@ -138,8 +139,11 @@ def get_post_by_id(db : Session, post_id : int):
       return post
 
 # DELETE A POST -->
-def delete_post(db : Session, post_id : int, current_user : User):
-      post = db.query(Post).filter(Post.id == post_id).first()
+async def delete_post(db : AsyncSession, post_id : int, current_user : User):
+      result = await db.execute(
+            select(Post).where(Post.id == post_id)
+      )
+      post = result.scalars().first()
 
       if post.user_id != current_user.id and current_user.role != "admin":
             raise HTTPException(
@@ -153,8 +157,8 @@ def delete_post(db : Session, post_id : int, current_user : User):
                   detail = "Post not found"
             )
 
-      db.delete(post)
-      db.commit()
+      await db.delete(post)
+      await db.commit()
 
       return {
             "message" : "Post deleted successfully",
@@ -162,8 +166,11 @@ def delete_post(db : Session, post_id : int, current_user : User):
       }
 
 # UPDATE POST -->
-def update_post(db : Session, post_id : int, payload : Post_update, current_user : User):
-      post = db.query(Post).filter(Post.id == post_id).first()
+async def update_post(db : AsyncSession, post_id : int, payload : Post_update, current_user : User):
+      result = await db.execute(
+            select(Post).where(Post.id == post_id)
+      )
+      post = result.scalars().first()
 
       if post.user_id != current_user.id and current_user.role != "admin":
             raise HTTPException(
@@ -182,8 +189,8 @@ def update_post(db : Session, post_id : int, payload : Post_update, current_user
       for key, value in updates.items():
             setattr(post, key, value)
 
-      db.commit()
-      db.refresh(post)
+      await db.commit()
+      await db.refresh(post)
 
       return PostResponse(
             id = post.id,
@@ -192,17 +199,14 @@ def update_post(db : Session, post_id : int, payload : Post_update, current_user
       )
 
 # ALL USERS STATS -->
-def all_users_stats(db : Session):
-      stats = (
-            db.query(
-                  User.id,
-                  User.name,
-                  func.count(Post.id).label("total_posts")
-            ).outerjoin(Post)
+async def all_users_stats(db : AsyncSession):
+      result = await db.execute(
+            select(User.id,User.name, func.count(Post.id))
+            .outerjoin(Post)
             .group_by(User.id, User.name)
             .order_by(User.id)
-            .all()
       )
+      stats = result.all()
 
       return [
             {
@@ -214,17 +218,15 @@ def all_users_stats(db : Session):
       ]
 
 # USERS WITH 0 POSTS -->
-def users_with_zero_posts(db : Session):
-      users = (
-            db.query(
-                  User.id,
-                  User.name
-            ).outerjoin(Post)
-            .group_by(User.id, User.name)
+async def users_with_zero_posts(db : AsyncSession):
+      result = await db.execute(
+            select(User.id,User.name)
+            .outerjoin(Post)
+            .group_by(User.id,User.name)
             .having(func.count(Post.id) == 0)
             .order_by(User.id)
-            .all()
       )
+      users = result.all()
 
       return [
             {
@@ -235,22 +237,32 @@ def users_with_zero_posts(db : Session):
       ]
 
 # POST SUMMARY -->
-def post_summary(db : Session):
-      return db.query(Post).all()
+async def post_summary(db : AsyncSession):
+      result = await db.execute(
+            select(Post)
+      )
+      posts = result.scalars().all()
+
+      return posts
 
 # TOTAL POSTS -->
-def total_posts(db : Session):
-      total = db.query(func.count(Post.id)).scalar()
+async def total_posts(db : AsyncSession):
+      result = await db.execute(
+            select(func.count()).select_from(Post)
+      )
+      total = result.scalar_one()
 
       return {
             "total_posts" : total
       }
 
 # TOTAL POSTS BY SPECIFIC ID -->
-def total_posts_by_id(db : Session, user_id : int):
-      total = (
-            db.query(Post).filter(Post.user_id == user_id).all()
+async def total_posts_by_id(db : AsyncSession, user_id : int):
+      result = await db.execute(
+            select(Post)
+            .where(Post.user_id == user_id)
       )
+      total = result.scalars().all()
 
       return [
             {

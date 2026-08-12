@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from schema.userDTO import Create_user, User_response, AdminDashboardResponse
-from database.database import get_db
-from database.models import User
+from app.schema.userDTO import Create_user, User_response, AdminDashboardResponse
+from app.database.database import get_db
+from app.database.models import User
 from sqlalchemy.orm import Session, joinedload, selectinload, load_only
-from utils.security import hash_password
-from dependencies.permissions import admin_required
-import services.user_services as user_services
-from dependencies.auth import get_current_user
+from app.utils.security import hash_password
+from app.dependencies.permissions import admin_required
+import app.services.user_services as user_services
+from app.dependencies.auth import get_current_user
 
 user_router = APIRouter(
     prefix = "/user",

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
-from schema.postDTO import PostResponse
+from app.schema.postDTO import PostResponse
 
 class Create_user(BaseModel):
     id : Optional[int]

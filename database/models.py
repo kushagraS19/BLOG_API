@@ -1,4 +1,4 @@
-from database.database import Base
+from app.database.database import Base
 from sqlalchemy import Integer, Column, String, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String)
     password = Column(String)
     role = Column(String)
+    age = Column(Integer, nullable = True)
     
     posts = relationship(
         "Post",

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from schema.postDTO import Create_post, Post_update, PostResponse, PostListResponse, PostWithUserResponse, PostPerUser, PostSummaryResponse
-from database.database import get_db
-from database.models import Post, User
+from app.schema.postDTO import Create_post, Post_update, PostResponse, PostListResponse, PostWithUserResponse, PostPerUser, PostSummaryResponse
+from app.database.database import get_db
+from app.database.models import Post, User
 from sqlalchemy.orm import Session, joinedload, load_only
-from dependencies.auth import get_current_user
-from dependencies.permissions import admin_required
+from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import admin_required
 from typing import Optional, Literal
 from sqlalchemy import asc, desc, or_ , func
-import services.post_services as post_services
+import app.services.post_services as post_services
 
 post_router = APIRouter(
     prefix = "/posts",

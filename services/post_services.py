@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
-from schema.postDTO import Create_post, PostListResponse, PostWithUserResponse, PostPerUser, Post_update, PostResponse, PostSummaryResponse
-from database.models import Post
-from database.models import User
+from app.schema.postDTO import Create_post, PostListResponse, PostWithUserResponse, PostPerUser, Post_update, PostResponse, PostSummaryResponse
+from app.database.models import Post
+from app.database.models import User
 from sqlalchemy import asc, desc, or_ , func
 from fastapi import HTTPException
 

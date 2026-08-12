@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
-from main import app
+from app.main import app
 
 @app.exception_handler(ValueError)
 async def value_error_handler(

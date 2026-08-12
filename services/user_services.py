@@ -1,9 +1,9 @@
-from schema.userDTO import Create_user
-from utils.security import hash_password
-from database.models import User
+from app.schema.userDTO import Create_user
+from app.utils.security import hash_password
+from app.database.models import User
 from fastapi import  HTTPException
 from sqlalchemy.orm import Session, joinedload, selectinload, load_only
-from dependencies.permissions import admin_required
+from app.dependencies.permissions import admin_required
 from sqlalchemy.exc import IntegrityError
 
 # USER REGISTER -->
